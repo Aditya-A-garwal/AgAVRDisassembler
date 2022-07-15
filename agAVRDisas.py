@@ -2,6 +2,8 @@ import sys
 
 branchSetSpecialized        = True
 branchClearSpecialized      = True
+bitSetSpecialized           = True
+bitClearSpecialized         = True
 
 def getNibbles (pNum):
     return [pNum & 0b1111, (pNum >> 4) & 0b1111, (pNum >> 8) & 0b1111, (pNum >> 12) & 0b1111, (pNum >> 16) & 0b1111, (pNum >> 20) & 0b1111, (pNum >> 24) & 0b1111, (pNum >> 4) & 0b1111, (pNum >> 8) & 0b1111, (pNum >> 28) & 0b1111]
@@ -186,15 +188,19 @@ def avrAND (pNum):
     r   |= (pNum & 0b1000000000) >> 5
     return f"AND     R{d}, R{r}\n"
 
-def avrCLR (pNum):
-    # EOR Rd, Rd
-    return f""
+# def avrCLR (pNum):
+#     # EOR Rd, Rd
+#     return f""
 
 def avrEOR (pNum):
     # 0010  01rd    dddd    rrrr
     # Rd = Rd xor Rr
-    d = (pNum >> 4) & 0b11111
-    r = (pNum & 0b1111) & (((pNum >> 9) & 0b1) << 4)
+    d   = (pNum & 0b111110000) >> 4
+    r   = (pNum & 0b1111)
+    r   |= (pNum & 0b1000000000) >> 5
+
+    if d == r:
+        return f"CLR     R{d}\n"
     return f"EOR     R{d}, R{r}\n"
 
 def avrMOV (pNum):
@@ -312,7 +318,33 @@ def avrBCLR (pNum):
     # 1001  0100    1sss    1000
     # Bit s of SREG = 0
     s   = (pNum >> 4) & 0b111
-    return f"BCLR    {s}\n"
+
+    if not bitClearSpecialized:
+        return f"BCLR    {s}\n"
+
+    if s == 0b000:
+        return f"CLC\n"
+
+    if s == 0b001:
+        return f"CLZ\n"
+
+    if s == 0b010:
+        return f"CLN\n"
+
+    if s == 0b011:
+        return f"CLV\n"
+
+    if s == 0b100:
+        return f"CLS\n"
+
+    if s == 0b101:
+        return f"CLH\n"
+
+    if s == 0b110:
+        return f"CLT\n"
+
+    if s == 0b111:
+        return f"CLI\n"
 
 def avrBREAK (pNum):
     # 1001  0101    1001    1000
@@ -323,48 +355,48 @@ def avrCBI (pNum):
     # 1001  1000    AAAA    Abbb
     # clear the b-th bit in the Ath IO register
     b = pNum & 0b111
-    A = (pNum >> 3) & 0b1111
+    A = (pNum & 0b11111000) >> 3
     return f"CBI     {A}, {b}\n"
 
-def avrCLC (pNum):
-    # 1001  0100    1000    1000
-    # clears the carry flag
-    return f"CLC\n"
+# def avrCLC (pNum):
+#     # 1001  0100    1000    1000
+#     # clears the carry flag
+#     return f"CLC\n"
 
-def avrCLH (pNum):
-    # 1001  0100    1101    1000
-    # clears the half carry flah
-    return f"CLH\n"
+# def avrCLH (pNum):
+#     # 1001  0100    1101    1000
+#     # clears the half carry flah
+#     return f"CLH\n"
 
-def avrCLI (pNum):
-    # 1001  0100    1111    1000
-    # clear global interrupt fla in SREG
-    return f"CLI\n"
+# def avrCLI (pNum):
+#     # 1001  0100    1111    1000
+#     # clear global interrupt fla in SREG
+#     return f"CLI\n"
 
-def avrCLN (pNum):
-    # 1001  0100    1010    1000
-    # clears the negative flag in SREG
-    return f"CLN\n"
+# def avrCLN (pNum):
+#     # 1001  0100    1010    1000
+#     # clears the negative flag in SREG
+#     return f"CLN\n"
 
-def avrCLS (pNum):
-    # 1001  0100    1100    1000
-    # clears signed flag in SREG
-    return f"CLS\n"
+# def avrCLS (pNum):
+#     # 1001  0100    1100    1000
+#     # clears signed flag in SREG
+#     return f"CLS\n"
 
-def avrCLT (pNum):
-    # 1001  0100    1110    1000
-    # clears the t flag in SREG
-    return f"CLT\n"
+# def avrCLT (pNum):
+#     # 1001  0100    1110    1000
+#     # clears the t flag in SREG
+#     return f"CLT\n"
 
-def avrCLV (pNum):
-    # 1001  0100    1011    1000
-    # clears the overflow flag in SREG
-    return f"CLV\n"
+# def avrCLV (pNum):
+#     # 1001  0100    1011    1000
+#     # clears the overflow flag in SREG
+#     return f"CLV\n"
 
-def avrCLZ (pNum):
-    # 1001  0100    1001    1000
-    # clears the zero flag in SREG
-    return f"CLZ\n"
+# def avrCLZ (pNum):
+#     # 1001  0100    1001    1000
+#     # clears the zero flag in SREG
+#     return f"CLZ\n"
 
 def avrCOM (pNum):
     # 1001  010d    dddd    0000
@@ -465,7 +497,33 @@ def avrBSET (pNum):
     # 1001  0100    0sss    1000
     # sets bit s in SREG
     s   = (pNum >> 4) & 0b111
-    return f"BSET    {s}\n"
+
+    if not bitSetSpecialized:
+        return f"BSET    {s}\n"
+
+    if s == 0b000:
+        return f"SEC\n"
+
+    if s == 0b001:
+        return f"SEZ\n"
+
+    if s == 0b010:
+        return f"SEN\n"
+
+    if s == 0b011:
+        return f"SEV\n"
+
+    if s == 0b100:
+        return f"SES\n"
+
+    if s == 0b101:
+        return f"SEH\n"
+
+    if s == 0b110:
+        return f"SET\n"
+
+    if s == 0b111:
+        return f"SEI\n"
 
 def avrLDY1 (pNum):
     # 1001  000d    dddd    1000
@@ -568,37 +626,37 @@ def avrSBIW (pNum):
     K   = (pNum & 0b1111) | ((pNum >> 2) & 0b110000)
     return f"SBIW    R{d}, {K}\n"
 
-def avrSEC (pNum):
-    # 1001  0100    0000    1000
-    return f"SEC\n"
+# def avrSEC (pNum):
+#     # 1001  0100    0000    1000
+#     return f"SEC\n"
 
-def avrSEH (pNum):
-    # 1001  0100    0101    1000
-    return f"SEH\n"
+# def avrSEH (pNum):
+#     # 1001  0100    0101    1000
+#     return f"SEH\n"
 
-def avrSEI (pNum):
-    # 1001  0100    0111    1000
-    return f"SEI\n"
+# def avrSEI (pNum):
+#     # 1001  0100    0111    1000
+#     return f"SEI\n"
 
-def avrSEN (pNum):
-    # 1001  0100    0010    1000
-    return f"SEH\n"
+# def avrSEN (pNum):
+#     # 1001  0100    0010    1000
+#     return f"SEH\n"
 
-def avrSES (pNum):
-    # 1001  0100    0100    1000
-    return f"SES\n"
+# # def avrSES (pNum):
+# #     # 1001  0100    0100    1000
+# #     return f"SES\n"
 
-def avrSET (pNum):
-    # 1001  0100    0110    1000
-    return f"SET\n"
+# def avrSET (pNum):
+#     # 1001  0100    0110    1000
+#     return f"SET\n"
 
-def avrSEV (pNum):
-    # 1001  0100    0011    1000
-    return f"SEV\n"
+# def avrSEV (pNum):
+#     # 1001  0100    0011    1000
+#     return f"SEV\n"
 
-def avrSEZ (pNum):
-    # 1001  0100    0001    1000
-    return f"SEI\n"
+# def avrSEZ (pNum):
+#     # 1001  0100    0001    1000
+#     return f"SEI\n"
 
 def avrSLEEP (pNum):
     # 1001  0101    1000    1000
@@ -712,7 +770,7 @@ def avrLDI (pNum):
 def avrSER (pNum):
     # 1110  1111    dddd    1111
     d = (pNum >> 4) & 0b1111
-    return f"SER\n"
+    return f"SER     R{d}\n"
 
 #! 1111
 
@@ -1145,38 +1203,6 @@ for i, e in enumerate (dat):
         f.write (avrCBI (e))
         continue
 
-    if bitMatch (e, "1001010010001000"):
-        f.write (avrCLC (e))
-        continue
-
-    if bitMatch (e, "1001010011011000"):
-        f.write (avrCLH (e))
-        continue
-
-    if bitMatch (e, "1001010011111000"):
-        f.write (avrCLI (e))
-        continue
-
-    if bitMatch (e, "1001010010101000"):
-        f.write (avrCLN (e))
-        continue
-
-    if bitMatch (e, "1001010011001000"):
-        f.write (avrCLS (e))
-        continue
-
-    if bitMatch (e, "1001010011101000"):
-        f.write (avrCLT (e))
-        continue
-
-    if bitMatch (e, "1001010010111000"):
-        f.write (avrCLV (e))
-        continue
-
-    if bitMatch (e, "1001010010011000"):
-        f.write (avrCLZ (e))
-        continue
-
     if bitMatch (e, "1001010ddddd0000"):
         f.write (avrCOM (e))
         continue
@@ -1327,38 +1353,6 @@ for i, e in enumerate (dat):
 
     if bitMatch (e, "10010111KKddKKKK"):
         f.write (avrSBIW (e))
-        continue
-
-    if bitMatch (e, "1001010000001000"):
-        f.write (avrSEC (e))
-        continue
-
-    if bitMatch (e, "1001010001011000"):
-        f.write (avrSEH (e))
-        continue
-
-    if bitMatch (e, "1001010001111000"):
-        f.write (avrSEI (e))
-        continue
-
-    if bitMatch (e, "1001010000101000"):
-        f.write (avrSEN (e))
-        continue
-
-    if bitMatch (e, "1001010001001000"):
-        f.write (avrSES (e))
-        continue
-
-    if bitMatch (e, "1001010001101000"):
-        f.write (avrSET (e))
-        continue
-
-    if bitMatch (e, "1001010000111000"):
-        f.write (avrSEV (e))
-        continue
-
-    if bitMatch (e, "1001010000011000"):
-        f.write (avrSEZ (e))
         continue
 
     if bitMatch (e, "1001010110001000"):
