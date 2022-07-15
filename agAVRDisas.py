@@ -1,5 +1,8 @@
 import sys
 
+branchSetSpecialized        = True
+branchClearSpecialized      = True
+
 def getNibbles (pNum):
     return [pNum & 0b1111, (pNum >> 4) & 0b1111, (pNum >> 8) & 0b1111, (pNum >> 12) & 0b1111, (pNum >> 16) & 0b1111, (pNum >> 20) & 0b1111, (pNum >> 24) & 0b1111, (pNum >> 4) & 0b1111, (pNum >> 8) & 0b1111, (pNum >> 28) & 0b1111]
 
@@ -178,9 +181,10 @@ def avrSUB (pNum):
 def avrAND (pNum):
     # 0010  00rd    dddd    rrrr
     # Rd = Rd & Rr
-    d   = (pNum >> 4) | 0b11111
-    r   = (pNum & 0b1111) & ((pNum >> 5) & 0b10000)
-    return f"AND     R{r}, R{d}\n"
+    d   = (pNum & 0b111110000) >> 4
+    r   = (pNum & 0b1111)
+    r   |= (pNum & 0b1000000000) >> 5
+    return f"AND     R{d}, R{r}\n"
 
 def avrCLR (pNum):
     # EOR Rd, Rd
@@ -296,7 +300,7 @@ def avrADIW (pNum):
     d   = (pNum >> 4) & 0b11
     d   = list([24, 26, 28, 30])[d]
     k   = (pNum & 0b1111) | ((pNum >> 2) & 0b110000)
-    return f"ADIW    R{d}+1:R{d}, {k}\n"
+    return f"ADIW    R{d + 1}:R{d}, {k}\n"
 
 def avrASR (pNum):
     # 1001  010d    dddd    0101
@@ -724,130 +728,180 @@ def avrBRBC (pNum):
     # If bit s of sreg is not set, increment program counter by k+1 else 1
     s   = pNum & 0b111
     k   = (pNum >> 3) & 0b1111111
-    return f"BRBC    {s}, {k}\n"
+    k   -= (1 << 7)
+
+    #! branchClearSpecialized should be user defined
+    if not branchClearSpecialized:
+        return f"BRBC    {s}, {k}\n"
+
+    if (s == 0b000):
+        return f"BRCC    {k}\n" # same as BRSH
+
+    if (s == 0b001):
+        return f"BRNE    {k}\n"
+
+    if (s == 0b010):
+        return f"BRPL    {k}\n"
+
+    if (s == 0b011):
+        return f"BRVC    {k}\n"
+
+    if (s == 0b100):
+        return f"BRGE    {k}\n"
+
+    if (s == 0b101):
+        return f"BRHC    {k}\n"
+
+    if (s == 0b110):
+        return f"BRTC    {k}\n"
+
+    if (s == 0b111):
+        return f"BRID    {k}\n"
 
 def avrBRBS (pNum):
     # 1111  00kk    kkkk    ksss
     # If bit s of sreg is set, increment program counter by k+1 else 1
     s   = pNum & 0b111
     k   = (pNum >> 3) & 0b1111111
-    return f"BRBS    {s}, {k}\n"
+    k   -= (1 << 7)
 
-def avrBRCC (pNum):
-    # 1111  01kk    kkkk    k000
-    # If bit C of carry flag is not set, increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRCC    {k}\n"
+    #! branchSetSpecialized should be user defined
+    if not branchSetSpecialized:
+        return f"BRBS    {s}, {k}\n"
 
-def avrBRCS (pNum):
-    # 1111  00kk    kkkk    k000
-    # If C is 1, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRCS    {k}\n"
+    if (s == 0b000):
+        return f"BRCS    {k}\n" # same as BRLO
 
-def avrBREQ (pNum):
-    # 1111  00kk    kkkk    k001
-    # If the zero flag is set, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BREQ    {k}\n"
+    if (s == 0b001):
+        return f"BREQ    {k}\n"
 
-def avrBRGE (pNum):
-    # 1111  01kk    kkkk    k100
-    # If the signed flag is cleared, increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRGE    {k}\n"
+    if (s == 0b010):
+        return f"BRMI    {k}\n"
 
-def avrBRHC (pNum):
-    # 1111  01kk    kkkk    k101
-    # If the half carry flag is cleared, increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRHC    {k}\n"
+    if (s == 0b011):
+        return f"BRVS    {k}\n"
 
-def avrBRHS (pNum):
-    # 1111  00kk    kkkk    k101
-    # If the half carry flag is set, increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRHS    {k}\n"
+    if (s == 0b100):
+        return f"BRLT    {k}\n"
 
-def avrBRID (pNum):
-    # 1111  01kk    kkkk    k111
-    # If the global interrupt is disabled, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRID    {k}\n"
+    if (s == 0b101):
+        return f"BRHS    {k}\n"
 
-def avrBRIE (pNum):
-    # 1111  00kk    kkkk    k111
-    # If the global interrupt is enabled, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRIE    {k}\n"
+    if (s == 0b110):
+        return f"BRTS    {k}\n"
 
-def avrBRLO (pNum):
-    # 1111  00kk    kkkk    k000
-    # If the carry flag is set, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRLO    {k}\n"
+    if (s == 0b111):
+        return f"BRIE    {k}\n"
 
-def avrBRLT (pNum):
-    # 1111  00kk    kkkk    k100
-    # If the signed flag is set, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRLT    {k}\n"
+# def avrBRCC (pNum):
+#     # 1111  01kk    kkkk    k000
+#     # If bit C of carry flag is not set, increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     k   -= (1 << 7)
+#     return f"BRCC    {k}\n"
 
-def avrBRMI (pNum):
-    # 1111  00kk    kkkk    k010
-    # If the negative flag is set, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRMI    {k}\n"
+# def avrBRCS (pNum):
+#     # 1111  00kk    kkkk    k000
+#     # If C is 1, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRCS    {k}\n"
 
-def avrBRNE (pNum):
-    # 1111  01kk    kkkk    k001
-    # If the zero flag is cleared, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
+# def avrBREQ (pNum):
+#     # 1111  00kk    kkkk    k001
+#     # If the zero flag is set, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BREQ    {k}\n"
 
-    # if the 6th bit of K is set, then add -128 to it
-    if (k >> 5) & 1:
-        k -= 128
+# def avrBRGE (pNum):
+#     # 1111  01kk    kkkk    k100
+#     # If the signed flag is cleared, increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRGE    {k}\n"
 
-    if ((pNum & 0b111) == 0b001) and (k > 6):
-        return avrBRBC (pNum)
+# def avrBRHC (pNum):
+#     # 1111  01kk    kkkk    k101
+#     # If the half carry flag is cleared, increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRHC    {k}\n"
 
-    return f"BRNE    {k}\n"
+# def avrBRHS (pNum):
+#     # 1111  00kk    kkkk    k101
+#     # If the half carry flag is set, increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRHS    {k}\n"
 
-def avrBRPL (pNum):
-    # 1111  01kk    kkkk    k010
-    # If the negative flag is cleared, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRPL    {k}\n"
+# def avrBRID (pNum):
+#     # 1111  01kk    kkkk    k111
+#     # If the global interrupt is disabled, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRID    {k}\n"
 
-def avrBRSH (pNum):
-    # 1111  01kk    kkkk    k000
-    # If the carry flag is cleared, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRSH    {k}\n"
+# def avrBRIE (pNum):
+#     # 1111  00kk    kkkk    k111
+#     # If the global interrupt is enabled, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRIE    {k}\n"
 
-def avrBRTC (pNum):
-    # 1111  01kk    kkkk    k110
-    # If the T flag is cleared, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRTC    {k}\n"
+# def avrBRLO (pNum):
+#     # 1111  00kk    kkkk    k000
+#     # If the carry flag is set, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRLO    {k}\n"
 
-def avrBRTS (pNum):
-    # 1111  01kk    kkkk    k000
-    # If the T flag is set, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRTS    {k}\n"
+# def avrBRLT (pNum):
+#     # 1111  00kk    kkkk    k100
+#     # If the signed flag is set, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRLT    {k}\n"
 
-def avrBRVC (pNum):
-    # 1111  01kk    kkkk    k000
-    # If the overflow flag is cleared, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRVC    {k}\n"
+# def avrBRMI (pNum):
+#     # 1111  00kk    kkkk    k010
+#     # If the negative flag is set, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRMI    {k}\n"
 
-def avrBRVS (pNum):
-    # 1111  01kk    kkkk    k000
-    # If the overflow flag is set, then increment program counter by k+1 else 1
-    k   = (pNum >> 3) & 0b1111111
-    return f"BRVS    {k}\n"
+# def avrBRNE (pNum):
+#     # 1111  01kk    kkkk    k001
+#     # If the zero flag is cleared, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRNE    {k}\n"
+
+# def avrBRPL (pNum):
+#     # 1111  01kk    kkkk    k010
+#     # If the negative flag is cleared, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRPL    {k}\n"
+
+# def avrBRSH (pNum):
+#     # 1111  01kk    kkkk    k000
+#     # If the carry flag is cleared, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     k   -= (1 << 7)
+#     return f"BRSH    {k}\n"
+
+# def avrBRTC (pNum):
+#     # 1111  01kk    kkkk    k110
+#     # If the T flag is cleared, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRTC    {k}\n"
+
+# def avrBRTS (pNum):
+#     # 1111  01kk    kkkk    k000
+#     # If the T flag is set, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRTS    {k}\n"
+
+# def avrBRVC (pNum):
+#     # 1111  01kk    kkkk    k000
+#     # If the overflow flag is cleared, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRVC    {k}\n"
+
+# def avrBRVS (pNum):
+#     # 1111  01kk    kkkk    k000
+#     # If the overflow flag is set, then increment program counter by k+1 else 1
+#     k   = (pNum >> 3) & 0b1111111
+#     return f"BRVS    {k}\n"
 
 def avrBST (pNum):
     # 1111  101d    dddd    0bbb
@@ -1407,76 +1461,8 @@ for i, e in enumerate (dat):
         f.write (avrBRBS (e))
         continue
 
-    if bitMatch (e, "111101kkkkkkk000"):
-        f.write (avrBRCC (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk000"):
-        f.write (avrBRCS (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk001"):
-        f.write (avrBREQ (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk100"):
-        f.write (avrBRGE (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk101"):
-        f.write (avrBRHC (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk101"):
-        f.write (avrBRHS (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk111"):
-        f.write (avrBRID (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk111"):
-        f.write (avrBRIE (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk000"):
-        f.write (avrBRLO (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk100"):
-        f.write (avrBRLT (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk010"):
-        f.write (avrBRMI (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk001"):
-        f.write (avrBRNE (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk010"):
-        f.write (avrBRPL (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk000"):
-        f.write (avrBRSH (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk110"):
-        f.write (avrBRTC (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk000"):
-        f.write (avrBRTS (e))
-        continue
-
-    if bitMatch (e, "111101kkkkkkk011"):
-        f.write (avrBRVC (e))
-        continue
-
-    if bitMatch (e, "111100kkkkkkk011"):
-        f.write (avrBRVS (e))
+    if bitMatch (e, "111101kkkkkkksss"):
+        f.write (avrBRBC (e))
         continue
 
     if bitMatch (e, "1111101ddddd0bbb"):
