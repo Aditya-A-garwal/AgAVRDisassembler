@@ -736,7 +736,7 @@ def avrSTZ3 (pNum):
     return f"ST      Y, R{r}\n"
 
 def avrSTS16 (pNum):
-    # 1001  1kkk    dddd    kkkk
+    # 1010  1kkk    dddd    kkkk
     d = ((pNum >> 4) & 0b1111) + 16
     k = (pNum & 0b1111) | ((pNum >> 4) & 0b1110000)
     return f"\n"
@@ -1403,7 +1403,7 @@ for i, e in enumerate (dat):
         f.write (avrSTZ3 (e))
         continue
 
-    if bitMatch (e, "10011kkkddddkkkk"):
+    if bitMatch (e, "10101kkkddddkkkk"):
         f.write (avrSTS16 (e))
         continue
 
