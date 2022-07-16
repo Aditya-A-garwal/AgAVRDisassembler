@@ -50,7 +50,7 @@ def avrSTS (pNum):
     # kkkk  kkkk    kkkk    kkkk
     d = (pNum >> 20) & 0b11111
     k = pNum & 0b1111111111111111
-    return f"STS {k}, R{d}\n"
+    return f"STS     {k}, R{d}\n"
 
 #! first nibble not constant
 
@@ -58,25 +58,45 @@ def avrLDZ4 (pNum):
     # 10q0  qq0d    dddd    0qqq
     d = (pNum >> 4) & 0b11111
     q = (pNum & 0b111) | ((pNum >> 7) & 0b11000) | ((pNum >> 8) & 0b100000)
-    return f"LD      R{d}, Z+q\n"
+
+    if q == 0:
+        return f"LD      R{d}, Z\n"
+
+    return f"LDD     R{d}, Z+{q}\n"
 
 def avrSTY4 (pNum):
     # 10q0  qq1r    rrrr    1qqq
-    r = (pNum >> 4) & 0b11111
-    q = (pNum & 0b111) | ((pNum >> 7) & 0b100) | ((pNum >> 8) & 0b100000)
+    r = (pNum & 0b111110000) >> 4
+    q = (pNum & 0b111)
+    q |= (pNum & 0b110000000000) >> 7
+    q |= (pNum & 0b10000000000000) >> 8
+
+    if q == 0:
+        return f"ST      Y, R{r}\n"
+
     return f"STD     Y+{q}, R{r}\n"
 
 def avrSTZ4 (pNum):
     # 10q0  qq1r    rrrr    0qqq
-    r = (pNum >> 4) & 0b11111
-    q = (pNum & 0b111) | ((pNum >> 7) & 0b100) | ((pNum >> 8) & 0b100000)
+    r = (pNum & 0b111110000) >> 4
+    q = (pNum & 0b111)
+    q |= (pNum & 0b110000000000) >> 7
+    q |= (pNum & 0b10000000000000) >> 8
+
+    if q == 0:
+        return f"ST      Z, R{r}\n"
+
     return f"STD     Z+{q}, R{r}\n"
 
 def avrLDY4 (pNum):
     # 10q0  qq0d    dddd    1qqq
     d = (pNum >> 4) & 0b11111
     q = (pNum & 0b111) | ((pNum >> 7) & 0b11000)
-    return f"LD      R{d}, Y+{q}\n"
+
+    if q == 0:
+        return f"LD      R{d}, Y\n"
+
+    return f"LDD     R{d}, Y+{q}\n"
 
 #! 0000
 
@@ -89,6 +109,10 @@ def avrADD (pNum):
     # Rd = Rd + Rr
     d   = (pNum >> 4) & 0b11111
     r   = (pNum & 0b1111) | ((pNum >> 5) & 0b10000)
+
+    if d == r:
+        return f"LSL     R{d}\n"
+
     return f"ADD     R{d}, R{r}\n"
 
 def avrFMUL (pNum):
@@ -108,15 +132,16 @@ def avrFMULS (pNum):
 def avrFMULSU (pNum):
     # 0000  0011    1ddd    1rrr
     # Rd * Rr = R1 (High) R0 (Low)
-    d = ((pNum >> 4) & 0b111) + 16
+    d = ((pNum & 4) & 0b111) + 16
     r = (pNum & 0b111) + 16
     return f"FMULSU  R{d}, R{r}\n"
 
 def avrCPC (pNum):
     # 0000  01rd    dddd    rrrr
     # compare Rd with Rr + carry C
-    d = (pNum >> 4) & 0b1111
-    r = (pNum & 0b1111) | (((pNum >> 9) & 0b1) << 4)
+    d = (pNum & 0b111110000) >> 4
+    r = pNum & 0b1111
+    r |= ((pNum >> 9) & 0b1) << 4
     return f"CPC     R{d}, R{r}\n"
 
 def avrMOVW (pNum):
@@ -152,6 +177,10 @@ def avrADC (pNum):
     # Rd = Rd + Rr + C
     d   = (pNum >> 4) & 0b11111
     r   = (pNum & 0b1111) | ((pNum >> 5) & 0b10000)
+
+    if d == r:
+        return f"ROL     R{d}\n"
+
     return f"ADC     R{d}, R{r}\n"
 
 def avrROL (pNum):
@@ -161,8 +190,9 @@ def avrROL (pNum):
 def avrCPSE (pNum):
     # 0001  00rd    dddd    rrrr
     # If Rd == Rr then increment program counter by 2 (or 3) else by 1
-    d = (pNum >> 4) & 0b1111
-    r = (pNum & 0b1111) | (((pNum >> 9) & 0b1) << 4)
+    d = (pNum & 0b111110000) >> 4
+    r = (pNum & 0b1111)
+    r |= (((pNum >> 9) & 0b1) << 4)
     return f"CPSE    R{d}, R{r}\n"
 
 def avrCP (pNum):
@@ -226,7 +256,7 @@ def avrCPI (pNum):
     # 0011  KKKK    dddd    KKKK
     # compare Rd with constant K
     d = ((pNum >> 4) & 0b1111) + 16
-    K = (pNum & 0b1111) & ((pNum << 4) & 0b11110000)
+    K = (pNum & 0b1111) | (((pNum >> 8) & 0b1111) << 4)
     return f"CPI     R{d}, {K}\n"
 
 #! 0100
@@ -234,7 +264,7 @@ def avrCPI (pNum):
 def avrSBCI (pNum):
     # 0100  KKKK    dddd    KKKK
     d = ((pNum >> 4) & 0b1111) + 16
-    K = (pNum & 0b1111) | ((pNum >> 4) & 0b11110000)
+    K = (pNum & 0b1111) | (((pNum >> 8) & 0b1111) << 4)
     return f"SBCI    R{d}, {K}\n"
 
 #! 0101
@@ -242,7 +272,7 @@ def avrSBCI (pNum):
 def avrSUBI (pNum):
     # 0101  KKKK    dddd    KKKK
     d = ((pNum >> 4) & 0b1111) + 16
-    K = (pNum & 0b1111) | ((pNum >> 4) & 0b11110000)
+    K = (pNum & 0b1111) | (((pNum >> 8) & 0b1111) << 4)
     return f"SUBI    R{d}, {K}\n"
 
 #! 0110
@@ -250,16 +280,16 @@ def avrSUBI (pNum):
 def avrORI (pNum):
     # 0110  KKKK    dddd    KKKK
     d = ((pNum >> 4) & 0b1111) + 16
-    K = (pNum & 0b1111) | ((pNum >> 4) & 0b11110000)
+    K = (pNum & 0b1111) | (((pNum >> 8) & 0b1111) << 4)
     return f"ORI     R{d}, {K}\n"
 
-def avrSBR (pNum):
-    # 0110  KKKK    dddd    KKKK
-    d   = ((pNum >> 4) & 0b1111) + 16
-    K1  = pNum & 0b1111
-    K2  = (pNum >> 8) & 0b1111
-    K   = (K2 << 4) | K1
-    return f"SBR     R{d}, {K}\n"
+# def avrSBR (pNum):
+#     # 0110  KKKK    dddd    KKKK
+#     d   = ((pNum >> 4) & 0b1111) + 16
+#     K1  = pNum & 0b1111
+#     K2  = (pNum >> 8) & 0b1111
+#     K   = (K2 << 4) | K1
+#     return f"SBR     R{d}, {K}\n"
 
 #! 0111
 
@@ -278,20 +308,20 @@ def avrCBR (pNum):
 
 #! 1000
 
-def avrLDZ1 (pNum):
-    # 1000  000d    dddd    0000
-    d = (pNum >> 4) & 0b11111
-    return f"LD      R{d}, Z\n"
+# def avrLDZ1 (pNum):
+#     # 1000  000d    dddd    0000
+#     d = (pNum >> 4) & 0b11111
+#     return f"LD      R{d}, Z\n"
 
-def avrSTY1 (pNum):
-    # 1000  001r    rrrr    1000
-    r = (pNum >> 4) & 0b11111
-    return f"ST      Y, R{r}\n"
+# def avrSTY1 (pNum):
+#     # 1000  001r    rrrr    1000
+#     r = (pNum >> 4) & 0b11111
+#     return f"ST      Y, R{r}\n"
 
-def avrSTZ1 (pNum):
-    # 1000  001r    rrrr    0000
-    r = (pNum >> 4) & 0b11111
-    return f"ST      Y, R{r}\n"
+# def avrSTZ1 (pNum):
+#     # 1000  001r    rrrr    0000
+#     r = (pNum >> 4) & 0b11111
+#     return f"ST      Z, R{r}\n"
 
 #! 1001
 
@@ -481,17 +511,17 @@ def avrLAT (pNum):
 def avrLDX1 (pNum):
     # 1001  000d    dddd    1100
     d = (pNum >> 4) & 0b11111
-    return f"LD R{d}, X\n"
+    return f"LD      R{d}, X\n"
 
 def avrLDX2 (pNum):
     # 1001  000d    dddd    1101
     d = (pNum >> 4) & 0b11111
-    return f"LD R{d}, X+\n"
+    return f"LD      R{d}, X+\n"
 
 def avrLDX3 (pNum):
     # 1001  000d    dddd    1110
     d = (pNum >> 4) & 0b11111
-    return f"LD R{d}, -X\n"
+    return f"LD      R{d}, -X\n"
 
 def avrBSET (pNum):
     # 1001  0100    0sss    1000
@@ -525,10 +555,10 @@ def avrBSET (pNum):
     if s == 0b111:
         return f"SEI\n"
 
-def avrLDY1 (pNum):
-    # 1001  000d    dddd    1000
-    d = (pNum >> 4) & 0b11111
-    return f"LD      R{d}, Y\n"
+# def avrLDY1 (pNum):
+#     # 1001  000d    dddd    1000
+#     d = (pNum >> 4) & 0b11111
+#     return f"LD      R{d}, Y\n"
 
 def avrLDY2 (pNum):
     # 1001  000d    dddd    1001
@@ -559,9 +589,9 @@ def avrLPM3 (pNum):
     d = (pNum >> 4) & 0b11111
     return f"LPM     R{d}, Z+\n"
 
-def avrLSL (pNum):
-    # ADD Rd, Rd
-    return f""
+# def avrLSL (pNum):
+#     # ADD Rd, Rd
+#     return f""
 
 def avrLSR (pNum):
     # 1001  010d    dddd    0110
@@ -1153,28 +1183,10 @@ for i, e in enumerate (dat):
         f.write (avrORI (e))
         continue
 
-    if bitMatch (e, "0110KKKKddddKKKK"):
-        f.write (avrSBR (e))
-        continue
-
     # 0111
 
     if bitMatch (e, "0111KKKKddddKKKK"):
         f.write (avrANDI (e))
-        continue
-
-    # 1000
-
-    if bitMatch (e, "1000000ddddd0000"):
-        f.write (avrLDZ1 (e))
-        continue
-
-    if bitMatch (e, "1000001rrrrr1000"):
-        f.write (avrSTY1 (e))
-        continue
-
-    if bitMatch (e, "1000001rrrrr0000"):
-        f.write (avrSTZ1 (e))
         continue
 
     # 1001
@@ -1277,10 +1289,6 @@ for i, e in enumerate (dat):
 
     if bitMatch (e, "100101000sss1000"):
         f.write (avrBSET (e))
-        continue
-
-    if bitMatch (e, "1001000ddddd1000"):
-        f.write (avrLDY1 (e))
         continue
 
     if bitMatch (e, "1001000ddddd1001"):
